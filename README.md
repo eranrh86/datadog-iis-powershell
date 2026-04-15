@@ -2,44 +2,72 @@
 
 Collect IIS and ASP.NET performance metrics from a Windows Server and send them to Datadog automatically — **without changing your application code**.
 
-This script reads Windows built-in performance counters and sends 11 metrics to Datadog every 15 seconds. It uses only PowerShell — no compiler, no Python, no extra tools.
+This script reads Windows built-in performance counters and sends **13 metrics** to Datadog every 15 seconds via DogStatsD (UDP 8125). It uses only PowerShell — no compiler, no Python, no extra tools.
 
 ---
 
 ## What metrics you will see in Datadog
 
-| Metric | What it shows |
-|---|---|
-| `aspnet.requests.current` | Requests being processed right now |
-| `aspnet.requests.queued` | Requests waiting to be processed |
-| `aspnet.requests.rejected` | Requests dropped because the queue was full |
-| `aspnet.requests.in_queue` | Requests in the Windows kernel queue |
-| `aspnet.request.execution_time` | Average time to process a request (ms) |
-| `aspnet.request.wait_time` | Average time a request waits before starting (ms) |
-| `iis.connections.current` | Active HTTP connections right now |
-| `iis.requests.get` | Total GET requests served |
-| `iis.requests.post` | Total POST requests served |
-| `w3wp.cpu_pct` | CPU % used by the IIS worker process |
-| `w3wp.memory_bytes` | Memory used by the IIS worker process |
+| Metric | Performance Counter | What it shows |
+|---|---|---|
+| `aspnet.requests.current` | `ASP.NET v4.0.30319\Requests Current` | Requests being processed right now |
+| `aspnet.requests.queued` | `ASP.NET v4.0.30319\Requests Queued` | Requests waiting to be processed |
+| `aspnet.requests.rejected` | `ASP.NET v4.0.30319\Requests Rejected` | Requests dropped because the queue was full |
+| `aspnet.requests.in_queue` | `ASP.NET v4.0.30319\Requests In Native Queue` | Requests in the Windows kernel queue |
+| `aspnet.request.execution_time` | `ASP.NET v4.0.30319\Request Execution Time` | Average time to process a request (ms) |
+| `aspnet.request.wait_time` | `ASP.NET v4.0.30319\Request Wait Time` | Average time a request waits before starting (ms) |
+| `aspnet.app.requests_executing` | `ASP.NET Applications(*)\Requests Executing` | Requests executing across all app pools (sum) |
+| `iis.connections.current` | `Web Service(_Total)\Current Connections` | Active HTTP connections right now |
+| `iis.requests.get` | `Web Service(_Total)\Total Get Requests` | Total GET requests served |
+| `iis.requests.post` | `Web Service(_Total)\Total Post Requests` | Total POST requests served |
+| `w3wp.cpu_pct` | `Process(w3wp*)\% Processor Time` | CPU % used by IIS worker processes (sum) |
+| `w3wp.memory_bytes` | `Process(w3wp*)\Working Set` | Memory used by IIS worker processes (sum) |
+| `w3wp.active_requests` | `W3SVC_W3WP(*)\Active Requests` | Active requests across all app pool workers (sum) |
 
 ---
 
 ## How it works
 
 ```
-IIS / ASP.NET  (your existing app — nothing changes)
+IIS / ASP.NET  (your existing app - nothing changes)
       |
       | Windows collects performance data automatically
       v
- ps_metrics.ps1  ← this script (runs every 15 seconds)
+ ps_metrics.ps1  <- this script (runs every 15 seconds)
       |
-      | UDP → 127.0.0.1:8125
+      | UDP -> 127.0.0.1:8125
       v
  Datadog Agent  (already on your server)
       |
       | HTTPS
       v
  Datadog
+```
+
+---
+
+## Datadog Dashboard
+
+A ready-made dashboard with all 13 metrics is included in this repo: **`dashboard.json`**
+
+### Import the dashboard
+
+1. Go to [app.datadoghq.com/dashboard/lists](https://app.datadoghq.com/dashboard/lists)
+2. Click **New Dashboard** -> **Import dashboard JSON**
+3. Paste the contents of `dashboard.json`
+4. Set the `host` template variable to your server hostname
+
+Or import via API:
+
+```powershell
+# From PowerShell on any machine with curl
+$body = Get-Content dashboard.json -Raw
+Invoke-RestMethod `
+    -Uri "https://api.datadoghq.com/api/v1/dashboard" `
+    -Method Post `
+    -Headers @{ "DD-API-KEY" = "<YOUR_API_KEY>"; "DD-APPLICATION-KEY" = "<YOUR_APP_KEY>" } `
+    -ContentType "application/json" `
+    -Body $body
 ```
 
 ---
@@ -58,15 +86,15 @@ Make sure you have:
 
 ---
 
-## Step 1 — Open PowerShell as Administrator
+## Step 1 - Open PowerShell as Administrator
 
-Click **Start** → type `PowerShell` → right-click **Windows PowerShell** → click **Run as administrator**.
+Click **Start** -> type `PowerShell` -> right-click **Windows PowerShell** -> click **Run as administrator**.
 
 Run all commands from this guide in that window.
 
 ---
 
-## Step 2 — Confirm the Datadog Agent is ready
+## Step 2 - Confirm the Datadog Agent is ready
 
 ```powershell
 netstat -an | findstr ":8125"
@@ -87,7 +115,7 @@ Then run the `netstat` command again.
 
 ---
 
-## Step 3 — Create a folder for the script
+## Step 3 - Create a folder for the script
 
 ```powershell
 New-Item -ItemType Directory -Path "C:\DatadogMetrics" -Force
@@ -95,7 +123,7 @@ New-Item -ItemType Directory -Path "C:\DatadogMetrics" -Force
 
 ---
 
-## Step 4 — Download the script
+## Step 4 - Download the script
 
 ```powershell
 Invoke-WebRequest `
@@ -105,7 +133,7 @@ Invoke-WebRequest `
 
 ---
 
-## Step 5 — Set your tags
+## Step 5 - Set your tags
 
 Open the script in Notepad:
 ```powershell
@@ -124,12 +152,9 @@ $tags = "env:production,app:my-website,tech:aspnet,tech:iis,collector:powershell
 
 Save and close Notepad.
 
-**What are tags?**
-Tags let you filter and group metrics in Datadog. `env` identifies your environment (production, staging, etc.) and `app` identifies which application these metrics belong to.
-
 ---
 
-## Step 6 — Test the script manually (optional but recommended)
+## Step 6 - Test the script manually (optional but recommended)
 
 Run the script once to see it working before setting it up as a background task:
 ```powershell
@@ -142,11 +167,11 @@ Datadog IIS metrics collector starting
 Sending to 127.0.0.1:8125 every 15s
 ```
 
-If you see that — it is working. Press `Ctrl+C` to stop. Now go to Datadog → Metrics Explorer and search for `iis.requests.get` — it should appear within 30 seconds.
+If you see that it is working. Press `Ctrl+C` to stop. Now go to Datadog -> Metrics Explorer and search for `iis.requests.get` — it should appear within 30 seconds.
 
 ---
 
-## Step 7 — Install as a Scheduled Task (runs automatically)
+## Step 7 - Install as a Scheduled Task (runs automatically)
 
 This installs the script as a background task that starts automatically when the server boots:
 
@@ -175,15 +200,9 @@ Register-ScheduledTask `
 Start-ScheduledTask -TaskName "Datadog-IIS-PowerShell"
 ```
 
-**What does this do?**
-- Creates a Windows Scheduled Task named `Datadog-IIS-PowerShell`
-- Runs as `SYSTEM` (the most privileged local account — required to read performance counters)
-- Starts automatically at every server boot
-- Restarts itself if it ever crashes
-
 ---
 
-## Step 8 — Confirm it is running
+## Step 8 - Confirm it is running
 
 ```powershell
 (Get-ScheduledTask -TaskName "Datadog-IIS-PowerShell").State
@@ -193,13 +212,13 @@ Expected output: `Running`
 
 ---
 
-## Step 9 — Validate metrics in Datadog
+## Step 9 - Validate metrics in Datadog
 
 1. Go to [app.datadoghq.com/metric/explorer](https://app.datadoghq.com/metric/explorer)
 2. Search for `aspnet.requests.current`
-3. All 11 metrics should appear within **30–60 seconds**
+3. All 13 metrics should appear within **30-60 seconds**
 
-**Quick test** — send one metric manually to confirm the pipeline works end to end:
+**Quick test** - send one metric manually to confirm the pipeline works end to end:
 ```powershell
 $udp = New-Object System.Net.Sockets.UdpClient
 $udp.Connect("127.0.0.1", 8125)
@@ -263,29 +282,29 @@ Remove-Item "C:\DatadogMetrics" -Recurse -Force
 
 ### No metrics appear in Datadog after 2 minutes
 
-**Check 1 — Is DogStatsD listening?**
+**Check 1 - Is DogStatsD listening?**
 ```powershell
 netstat -an | findstr ":8125"
 ```
 Must show `UDP 127.0.0.1:8125 *:*`.
 If not: `Restart-Service datadogagent`
 
-**Check 2 — Is the task running?**
+**Check 2 - Is the task running?**
 ```powershell
 (Get-ScheduledTask -TaskName "Datadog-IIS-PowerShell").State
 ```
 Must show `Running`. If not: `Start-ScheduledTask -TaskName "Datadog-IIS-PowerShell"`
 
-**Check 3 — Does the pipeline work at all?**
+**Check 3 - Does the pipeline work at all?**
 Run the Quick test from Step 9. If `iis.healthcheck` appears in Datadog, the DogStatsD pipeline is fine and the issue is with reading performance counters.
 
 ---
 
-### `w3wp.cpu_pct` and `w3wp.memory_bytes` show no data
+### `w3wp.cpu_pct`, `w3wp.memory_bytes`, and `w3wp.active_requests` show no data
 
 IIS shuts down the `w3wp.exe` worker process after **20 minutes of no traffic** (the default idle timeout). When w3wp is not running, there is nothing to measure.
 
-**Fix** — send some requests to restart the worker:
+**Fix** - send some requests to restart the worker:
 ```powershell
 1..10 | ForEach-Object {
     Invoke-WebRequest http://localhost/ -UseBasicParsing | Out-Null
@@ -293,8 +312,14 @@ IIS shuts down the `w3wp.exe` worker process after **20 minutes of no traffic** 
 ```
 Metrics will resume within 15 seconds.
 
-**Prevent it in production** — open IIS Manager:
-`Application Pools` → right-click your pool → `Advanced Settings` → set **Idle Time-out (minutes)** to `0`
+**Prevent it in production** - open IIS Manager:
+`Application Pools` -> right-click your pool -> `Advanced Settings` -> set **Idle Time-out (minutes)** to `0`
+
+---
+
+### `aspnet.app.requests_executing` shows no data
+
+This counter reads from `ASP.NET Applications(*)\Requests Executing` using the `__Total__` instance. It requires at least one ASP.NET 4.x application pool to be registered in IIS. The `iis.*` and `w3wp.*` counters will still work without it.
 
 ---
 
@@ -306,14 +331,8 @@ Get-EventLog -LogName Application -Source "DD-PSMetrics" -Newest 10 | Format-Lis
 ```
 
 Common causes:
-- Performance counter category name differs on your server — open `perfmon.exe` → Add Counters to find the exact names
-- Missing permissions — confirm the Scheduled Task runs as `SYSTEM`
-
----
-
-### ASP.NET counters show no data
-
-The `aspnet.*` counters require at least one ASP.NET 4.x application to have received at least one request. If your site is static HTML or uses a different .NET version, these counters may not be populated. The `iis.*` and `w3wp.*` counters will still work.
+- Performance counter category name differs on your server - open `perfmon.exe` -> Add Counters to find the exact names
+- Missing permissions - confirm the Scheduled Task runs as `SYSTEM`
 
 ---
 
@@ -321,5 +340,5 @@ The `aspnet.*` counters require at least one ASP.NET 4.x application to have rec
 
 | File | Purpose |
 |---|---|
-| `ps_metrics.ps1` | The metrics collector — edit `$tags` at the top to customize |
-| `C:\DatadogMetrics\ps_metrics.ps1` | Where the script lives on the server |
+| `ps_metrics.ps1` | The metrics collector - edit `$tags` at the top to customize |
+| `dashboard.json` | Datadog dashboard definition - import to get all 13 metrics visualized instantly |

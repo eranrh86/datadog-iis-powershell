@@ -1,0 +1,328 @@
+{
+  "title": "CyberArk-Powershell \u2014 IIS & ASP.NET Custom Metrics",
+  "description": "All 13 custom metrics from CyberArk-Powershell via DogStatsD",
+  "layout_type": "ordered",
+  "template_variables": [
+    {
+      "name": "host",
+      "prefix": "host",
+      "default": "CyberArk-Powershell"
+    }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Requests Current",
+        "requests": [
+          {
+            "q": "avg:aspnet.requests.current{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "dog_classic",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 8259085013317485
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Requests Queued",
+        "requests": [
+          {
+            "q": "avg:aspnet.requests.queued{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "warm",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 1889122845405099
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Requests Rejected",
+        "requests": [
+          {
+            "q": "avg:aspnet.requests.rejected{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "red",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 4350268192899933
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Requests In Queue",
+        "requests": [
+          {
+            "q": "avg:aspnet.requests.in_queue{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "orange",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 2559819984712033
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Request Execution Time",
+        "requests": [
+          {
+            "q": "avg:aspnet.request.execution_time{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "purple",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 3209073299099805
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET \u2014 Request Wait Time",
+        "requests": [
+          {
+            "q": "avg:aspnet.request.wait_time{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "cool",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 7607461782677827
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "ASP.NET Apps \u2014 Requests Executing",
+        "requests": [
+          {
+            "q": "avg:aspnet.app.requests_executing{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "green",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 8695622600174465
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "IIS \u2014 Current Connections",
+        "requests": [
+          {
+            "q": "avg:iis.connections.current{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "green",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 2786188441792084
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "IIS \u2014 Total GET Requests",
+        "requests": [
+          {
+            "q": "avg:iis.requests.get{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "dog_classic",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 7970040546705482
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "IIS \u2014 Total POST Requests",
+        "requests": [
+          {
+            "q": "avg:iis.requests.post{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "warm",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 2884179680545369
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "w3wp \u2014 CPU %",
+        "requests": [
+          {
+            "q": "avg:w3wp.cpu_pct{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "orange",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 360712721440039
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "w3wp \u2014 Memory Bytes",
+        "requests": [
+          {
+            "q": "avg:w3wp.memory_bytes{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "purple",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 6524503403637250
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "w3wp \u2014 Active Requests",
+        "requests": [
+          {
+            "q": "avg:w3wp.active_requests{host:$host.value}",
+            "display_type": "line",
+            "style": {
+              "palette": "cool",
+              "line_type": "solid",
+              "line_width": "normal"
+            }
+          }
+        ],
+        "yaxis": {
+          "scale": "linear",
+          "include_zero": true
+        },
+        "show_legend": false,
+        "time": {}
+      },
+      "id": 5527973204886466
+    }
+  ],
+  "notify_list": null,
+  "restricted_roles": []
+}
