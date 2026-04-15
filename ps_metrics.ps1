@@ -1,7 +1,7 @@
 # =============================================================================
 # Datadog IIS/ASP.NET Metrics Collector — PowerShell
 # =============================================================================
-# Reads Windows Performance Counters and sends 11 IIS/ASP.NET metrics
+# Reads Windows Performance Counters and sends 13 IIS/ASP.NET metrics
 # to Datadog every 15 seconds via DogStatsD (UDP port 8125).
 #
 # Requirements:
@@ -85,6 +85,44 @@ function Read-Counter {
 }
 
 
+function Read-Counter-SumAllInstances {
+    <#
+    .SYNOPSIS
+        Enumerate all instances of a multi-instance Performance Counter category
+        and return the sum across all instances (excluding _Total / __Total__).
+        Returns $null if the category does not exist or has no instances.
+    #>
+    param(
+        [string]$category,
+        [string]$counter
+    )
+    try {
+        $cat = New-Object System.Diagnostics.PerformanceCounterCategory($category)
+        $instances = $cat.GetInstanceNames() | Where-Object { $_ -notmatch '^_+Total_*$' -and $_ -ne '' }
+        if (-not $instances) { return $null }
+
+        $total = 0.0
+        $found = 0
+        foreach ($inst in $instances) {
+            try {
+                $pc = New-Object System.Diagnostics.PerformanceCounter($category, $counter, $inst, $true)
+                $pc.NextValue() | Out-Null
+                Start-Sleep -Milliseconds 50
+                $val = $pc.NextValue()
+                $pc.Close()
+                $pc.Dispose()
+                $total += $val
+                $found++
+            } catch {}
+        }
+        if ($found -gt 0) { return $total }
+        return $null
+    } catch {
+        return $null
+    }
+}
+
+
 Write-Host "Datadog IIS metrics collector starting"
 Write-Host "Sending to ${statsd}:${port} every ${interval}s"
 
@@ -102,6 +140,13 @@ while ($true) {
     foreach ($m in $aspnet.GetEnumerator()) {
         $val = Read-Counter -category $m.Value[0] -counter $m.Value[1]
         if ($val -ne $null) { Send-Gauge -metric $m.Key -value $val -tags $tags }
+    }
+
+    # ── ASP.NET Applications — per-app-pool requests executing ────────────────
+    # \ASP.NET Applications(*)\Requests Executing  — summed across all app pools
+    $appReqExec = Read-Counter-SumAllInstances -category "ASP.NET Applications" -counter "Requests Executing"
+    if ($appReqExec -ne $null) {
+        Send-Gauge -metric "aspnet.app.requests_executing" -value $appReqExec -tags $tags
     }
 
     # ── IIS Web Service counters ───────────────────────────────────────────────
@@ -135,6 +180,13 @@ while ($true) {
     if ($found -gt 0) {
         Send-Gauge -metric "w3wp.cpu_pct"      -value $cpu_total -tags $tags
         Send-Gauge -metric "w3wp.memory_bytes" -value $mem_total -tags $tags
+    }
+
+    # ── W3SVC_W3WP — Active Requests per app pool ─────────────────────────────
+    # \W3SVC_W3WP(*)\Active Requests — summed across all app pool worker processes
+    $w3ActiveReq = Read-Counter-SumAllInstances -category "W3SVC_W3WP" -counter "Active Requests"
+    if ($w3ActiveReq -ne $null) {
+        Send-Gauge -metric "w3wp.active_requests" -value $w3ActiveReq -tags $tags
     }
 
     Start-Sleep -Seconds $interval
