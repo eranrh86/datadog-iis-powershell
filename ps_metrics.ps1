@@ -1,7 +1,7 @@
 # =============================================================================
 # Datadog IIS/ASP.NET Metrics Collector — PowerShell
 # =============================================================================
-# Reads Windows Performance Counters and sends 13 IIS/ASP.NET metrics
+# Reads Windows Performance Counters and sends IIS/ASP.NET/process metrics
 # to Datadog every 15 seconds via DogStatsD (UDP port 8125).
 #
 # Requirements:
@@ -16,12 +16,15 @@
 #   See README.md
 # =============================================================================
 
-# ─── CONFIGURE THESE ─────────────────────────────────────────────────────────
+# --- CONFIGURE THESE ---------------------------------------------------------
 $tags     = "env:production,app:your-app,tech:aspnet,tech:iis,collector:powershell"
 $interval = 15          # seconds between metric collections
 $statsd   = "127.0.0.1" # Datadog Agent DogStatsD host
 $port     = 8125         # Datadog Agent DogStatsD port
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+
+# Processes to monitor for CPU and Memory
+$targetProcesses = @("dbmain", "BLServiceApp", "ENE")
 
 # Register a Windows Event Log source so errors appear in Event Viewer
 try {
@@ -32,10 +35,6 @@ try {
 
 
 function Send-Gauge {
-    <#
-    .SYNOPSIS
-        Send one metric to Datadog via DogStatsD UDP.
-    #>
     param(
         [string]$metric,
         [double]$value,
@@ -57,11 +56,6 @@ function Send-Gauge {
 
 
 function Read-Counter {
-    <#
-    .SYNOPSIS
-        Read one Windows Performance Counter.
-        Returns $null if the counter is unavailable (e.g. w3wp not running).
-    #>
     param(
         [string]$category,
         [string]$counter,
@@ -73,7 +67,7 @@ function Read-Counter {
         } else {
             $pc = New-Object System.Diagnostics.PerformanceCounter($category, $counter, "", $true)
         }
-        $pc.NextValue() | Out-Null   # first call always returns 0 — discard it
+        $pc.NextValue() | Out-Null   # first call always returns 0 -- discard it
         Start-Sleep -Milliseconds 100
         $val = $pc.NextValue()
         $pc.Close()
@@ -86,12 +80,6 @@ function Read-Counter {
 
 
 function Read-Counter-SumAllInstances {
-    <#
-    .SYNOPSIS
-        Enumerate all instances of a multi-instance Performance Counter category
-        and return the sum across all instances (excluding _Total / __Total__).
-        Returns $null if the category does not exist or has no instances.
-    #>
     param(
         [string]$category,
         [string]$counter
@@ -123,12 +111,38 @@ function Read-Counter-SumAllInstances {
 }
 
 
+# Reads CPU % and Working Set for a named process (all instances summed).
+# Returns @{cpu=$cpu; mem=$mem; running=$true/$false}
+function Read-Process-Metrics {
+    param([string]$processName)
+    $cpu_total = 0.0
+    $mem_total = 0.0
+    $found = 0
+    # Instance names: processName, processName#1, processName#2 ... #9
+    $candidates = @($processName) + (1..9 | ForEach-Object { "$processName#$_" })
+    foreach ($inst in $candidates) {
+        $cpu = Read-Counter -category "Process" -counter "% Processor Time" -instance $inst
+        $mem = Read-Counter -category "Process" -counter "Working Set"       -instance $inst
+        if ($cpu -ne $null) {
+            $cpu_total += $cpu
+            $mem_total += $mem
+            $found++
+        }
+    }
+    return @{
+        cpu     = $cpu_total
+        mem     = $mem_total
+        running = ($found -gt 0)
+    }
+}
+
+
 Write-Host "Datadog IIS metrics collector starting"
 Write-Host "Sending to ${statsd}:${port} every ${interval}s"
 
 while ($true) {
 
-    # ── ASP.NET v4 counters ────────────────────────────────────────────────────
+    # -- ASP.NET v4 counters ---------------------------------------------------
     $aspnet = @{
         "aspnet.requests.current"       = @("ASP.NET v4.0.30319", "Requests Current")
         "aspnet.requests.queued"        = @("ASP.NET v4.0.30319", "Requests Queued")
@@ -142,15 +156,13 @@ while ($true) {
         if ($val -ne $null) { Send-Gauge -metric $m.Key -value $val -tags $tags }
     }
 
-    # ── ASP.NET Applications — Requests Executing ───────────────────────────────
-    # \ASP.NET Applications(*)\Requests Executing — uses __Total__ instance (always present)
+    # -- ASP.NET Applications - Requests Executing ----------------------------
     $appReqExec = Read-Counter -category "ASP.NET Applications" -counter "Requests Executing" -instance "__Total__"
     if ($appReqExec -ne $null) {
         Send-Gauge -metric "aspnet.app.requests_executing" -value $appReqExec -tags $tags
     }
 
-    # ── IIS Web Service counters ───────────────────────────────────────────────
-    # _Total means all IIS sites combined
+    # -- IIS Web Service counters ----------------------------------------------
     $iis = @{
         "iis.connections.current" = @("Web Service", "Current Connections")
         "iis.requests.get"        = @("Web Service", "Total Get Requests")
@@ -161,9 +173,7 @@ while ($true) {
         if ($val -ne $null) { Send-Gauge -metric $m.Key -value $val -tags $tags }
     }
 
-    # ── w3wp IIS worker process ────────────────────────────────────────────────
-    # There can be multiple w3wp instances (one per app pool).
-    # We sum all of them: w3wp, w3wp#1, w3wp#2 ... w3wp#7
+    # -- w3wp IIS worker process -----------------------------------------------
     $cpu_total = 0.0
     $mem_total = 0.0
     $found     = 0
@@ -182,11 +192,18 @@ while ($true) {
         Send-Gauge -metric "w3wp.memory_bytes" -value $mem_total -tags $tags
     }
 
-    # ── W3SVC_W3WP — Active Requests per app pool ─────────────────────────────
-    # \W3SVC_W3WP(*)\Active Requests — summed across all app pool worker processes
-    # Sends 0 when no instances are active (idle server) — valid metric value
+    # -- W3SVC_W3WP - Active Requests per app pool ----------------------------
     $w3ActiveReq = Read-Counter-SumAllInstances -category "W3SVC_W3WP" -counter "Active Requests"
     Send-Gauge -metric "w3wp.active_requests" -value ([double]($w3ActiveReq ?? 0)) -tags $tags
+
+    # -- Application Process Metrics: dbmain, BLServiceApp, ENE ---------------
+    foreach ($procName in $targetProcesses) {
+        $result   = Read-Process-Metrics -processName $procName
+        $procTags = "$tags,process_name:$procName"
+        # Always send -- 0 when process is not running (visible gap in graph)
+        Send-Gauge -metric "process.cpu_pct"      -value ([double]$result.cpu) -tags $procTags
+        Send-Gauge -metric "process.memory_bytes" -value ([double]$result.mem) -tags $procTags
+    }
 
     Start-Sleep -Seconds $interval
 }
