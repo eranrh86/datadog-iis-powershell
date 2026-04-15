@@ -142,9 +142,9 @@ while ($true) {
         if ($val -ne $null) { Send-Gauge -metric $m.Key -value $val -tags $tags }
     }
 
-    # ── ASP.NET Applications — per-app-pool requests executing ────────────────
-    # \ASP.NET Applications(*)\Requests Executing  — summed across all app pools
-    $appReqExec = Read-Counter-SumAllInstances -category "ASP.NET Applications" -counter "Requests Executing"
+    # ── ASP.NET Applications — Requests Executing ───────────────────────────────
+    # \ASP.NET Applications(*)\Requests Executing — uses __Total__ instance (always present)
+    $appReqExec = Read-Counter -category "ASP.NET Applications" -counter "Requests Executing" -instance "__Total__"
     if ($appReqExec -ne $null) {
         Send-Gauge -metric "aspnet.app.requests_executing" -value $appReqExec -tags $tags
     }
@@ -184,10 +184,9 @@ while ($true) {
 
     # ── W3SVC_W3WP — Active Requests per app pool ─────────────────────────────
     # \W3SVC_W3WP(*)\Active Requests — summed across all app pool worker processes
+    # Sends 0 when no instances are active (idle server) — valid metric value
     $w3ActiveReq = Read-Counter-SumAllInstances -category "W3SVC_W3WP" -counter "Active Requests"
-    if ($w3ActiveReq -ne $null) {
-        Send-Gauge -metric "w3wp.active_requests" -value $w3ActiveReq -tags $tags
-    }
+    Send-Gauge -metric "w3wp.active_requests" -value ([double]($w3ActiveReq ?? 0)) -tags $tags
 
     Start-Sleep -Seconds $interval
 }
